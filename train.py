@@ -39,6 +39,7 @@ def get_batch(split: str):
         raise ValueError("Input must be one of the following: 'train', 'validation', 'test")
     
     inds = torch.randint(high = len(data) - context_length, size = (batch_size,))
-    print(inds)
+    x = torch.stack([data[i:i+context_length] for i in inds])
+    y = torch.stack([data[i+1:i+context_length+1] for i in inds])
     
 get_batch("train")
