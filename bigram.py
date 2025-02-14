@@ -12,8 +12,8 @@ import random
 #hyperparameters
 context_length = 8
 batch_size = 32
-epochs = 40000
-eval_interval = 10000
+epochs = 10000
+eval_interval = 2000
 eval_iterations = 2500
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 torch.manual_seed(1337)
@@ -76,7 +76,7 @@ class BigramModel(nn.Module):
         
         return logits
     
-    def generate(self, max_new_tokens = 200, starting_token = "\n", print = False):
+    def generate(self, max_new_tokens = 200, starting_token = "\n", display = False):
         text = starting_token
         ind = torch.tensor(encode(starting_token)).to(device)
         ind_list = list(range(vocab_size))
@@ -91,7 +91,7 @@ class BigramModel(nn.Module):
                 new_char = decode([ind.item()])
                 text += new_char
         
-        if print:
+        if display:
             print(text)
             print()
         
@@ -108,7 +108,7 @@ def eval(model, iterations):
         x_batch, y_batch = x_batch.to(device), y_batch.to(device)
         
         #Push x_batch through the model and calculate the loss
-        logits = model(y_batch)
+        logits = model(x_batch)
         eval_loss = F.cross_entropy(logits, y_batch.view(-1))
         
         eval_losses.append(eval_loss.item())
@@ -135,7 +135,7 @@ def train(model, optimizer, epochs):
     eval_losses = []
     
     model.train()
-    for i in tqdm(range(epochs)):
+    for i in range(epochs):
         #Grab a batch of data
         x_batch, y_batch = get_batch("train")
         x_batch, y_batch = x_batch.to(device), y_batch.to(device)    
@@ -164,7 +164,8 @@ def train(model, optimizer, epochs):
             if eval_loss.item() < lowest_eval_loss:
                 lowest_eval_loss = eval_loss.item()
                 
-    print(f"Lowest Training Loss: {lowest_training_loss}, Lowest Test Loss: {lowest_eval_loss}")
+    print(f"Iteration: {i}, Lowest Training Loss: {round(lowest_training_loss,3)}, Lowest Test Loss: {round(lowest_eval_loss,3)}")
+    print()
                 
     return training_losses, eval_losses
 
@@ -183,4 +184,4 @@ graph_losses(training_losses, "Training")
 graph_losses(eval_losses, "Testing")
 
 #Generate and print out a text sample
-new_text = bigram_model.generate(print = True)
+new_text = bigram_model.generate(display = True)
