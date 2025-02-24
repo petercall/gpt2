@@ -3,6 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from matplotlib import pyplot as plt
 import numpy as np
+import torch.optim.lr_scheduler as lr_scheduler
+import torch.optim as optim
+from transformers import AutoTokenizer
+
+
+tokenizer = AutoTokenizer.from_pretrained("gpt2")
+
+print(tokenizer)
 
 
 

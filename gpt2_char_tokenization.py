@@ -10,17 +10,10 @@ import random
 
 
 #hyperparameters
-small = False
-print_vals = False
 
-if small:
-    batch_size = 2
-    context_length = 4
-    embed_dim = 8
-else:
-    batch_size = 128
-    context_length = 64
-    embed_dim = 256
+batch_size = 128
+context_length = 64
+embed_dim = 256
     
 num_heads = 8
 num_decoders = 10
@@ -36,12 +29,6 @@ torch.manual_seed(1337)
 #---------------
 
 #region
-if print_vals:
-    print(f"Batch size: {batch_size}")
-    print(f"Context length: {context_length}")
-    print(f"Embedding dimension: {embed_dim}")
-    print()
-
 #load in the train, validation, and test text
 with open("data/train.txt", "r") as file:
     train_text = file.read()
