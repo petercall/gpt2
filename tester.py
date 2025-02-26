@@ -9,8 +9,9 @@ from transformers import AutoTokenizer
 
 
 tokenizer = AutoTokenizer.from_pretrained("gpt2")
+tokenizer.pad_token = tokenizer.eos_token
 
-print(tokenizer)
-
-
-
+input_text = "This is a test string"
+token_ids = tokenizer(input_text)["input_ids"]
+print(token_ids)
+print(tokenizer.decode(token_ids))

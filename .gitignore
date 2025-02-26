@@ -1,1 +1,6 @@
+#Ignore pictures
 *.png
+
+#Ignore data files
+*.txt
+*.csv

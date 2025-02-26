@@ -222,18 +222,18 @@ def graph_losses(losses: list, name: str):
 
 
 #Create the model and optimizer
-gpt = gpt2(vocab_size, embed_dim).to(device)
-optimizer = optim.AdamW(gpt.parameters())
+# gpt = gpt2(vocab_size, embed_dim).to(device)
+# optimizer = optim.AdamW(gpt.parameters())
 
-# Train the model
-training_losses, eval_losses = train(gpt, optimizer, epochs)
+# # Train the model
+# training_losses, eval_losses = train(gpt, optimizer, epochs)
 
-#Save graphs of the losses
-graph_losses(training_losses, "Training")
-graph_losses(eval_losses, "Testing")
+# #Save graphs of the losses
+# graph_losses(training_losses, "Training")
+# graph_losses(eval_losses, "Testing")
 
-# #Generate and print out a text sample
-new_text = gpt.generate("How can this be done?", max_new_tokens = 30)
-print()
-print(new_text)
-print()
+# # #Generate and print out a text sample
+# new_text = gpt.generate("How can this be done?", max_new_tokens = 30)
+# print()
+# print(new_text)
+# print()
