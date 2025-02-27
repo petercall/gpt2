@@ -1,21 +1,28 @@
 from datasets import load_dataset
 import pandas as pd
 import numpy as np
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers import pipeline
 from tqdm import tqdm
 
-#Load in the data
-train_data = pd.read_csv("data/train.csv")
 
-#List of possible classes
-class_list = ['abstract_algebra', 'anatomy', 'astronomy', 'business_ethics', 'clinical_knowledge', 'college_biology', 'college_chemistry', 'college_computer_science', 'college_mathematics', 'college_medicine', 'college_physics', 'computer_security', 'conceptual_physics', 'econometrics', 'electrical_engineering', 'elementary_mathematics', 'formal_logic', 'global_facts', 'high_school_biology', 'high_school_chemistry', 'high_school_computer_science', 'high_school_european_history', 'high_school_geography', 'high_school_government_and_politics', 'high_school_macroeconomics', 'high_school_mathematics', 'high_school_microeconomics', 'high_school_physics', 'high_school_psychology', 'high_school_statistics', 'high_school_us_history', 'high_school_world_history', 'human_aging', 'human_sexuality', 'international_law', 'jurisprudence', 'logical_fallacies', 'machine_learning', 'management', 'marketing', 'medical_genetics', 'miscellaneous', 'moral_disputes', 'moral_scenarios', 'nutrition', 'philosophy', 'prehistory', 'professional_accounting', 'professional_law', 'professional_medicine', 'professional_psychology', 'public_relations', 'security_studies', 'sociology', 'us_foreign_policy', 'virology', 'world_religions']
+device = "cuda" # the device to load the model onto
 
-#Load in the model
-model = AutoModelForSequenceClassification("facebook/bart-large-mnli")
-tokenizer = AutoTokenizer("facebook/bart-large-mnli")
-pipe = pipeline("zero-shot-classification", model = model, tokenizer = tokenizer, device = "cuda")
+model = AutoModelForCausalLM.from_pretrained("mistralai/Mistral-7B-Instruct-v0.2")
+tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-Instruct-v0.2")
 
-#Label each one
-for i in tqdm(range(train_data.shape[0])):
+messages = [
+    {"role": "user", "content": "What is your favourite condiment?"},
+    {"role": "assistant", "content": "Well, I'm quite partial to a good squeeze of fresh lemon juice. It adds just the right amount of zesty flavour to whatever I'm cooking up in the kitchen!"},
+    {"role": "user", "content": "Do you have mayonnaise recipes?"}
+]
+
+encodeds = tokenizer.apply_chat_template(messages, return_tensors="pt")
+
+model_inputs = encodeds.to(device)
+model.to(device)
+
+generated_ids = model.generate(model_inputs, max_new_tokens=1000, do_sample=True)
+decoded = tokenizer.batch_decode(generated_ids)
+print(decoded[0])    
     
