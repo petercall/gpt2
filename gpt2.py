@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 import numpy as np
@@ -10,6 +10,9 @@ from tqdm import tqdm
 import random
 from transformers import AutoTokenizer
 import os
+from tqdm.auto import tqdm
+import logging
+logging.getLogger("transformers").setLevel(logging.ERROR)   #Used to supress the error the tokenizer gives when we tokenize the entire training sequence all at once.
 
 
 #hyperparameters------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -20,18 +23,17 @@ tokenizer.pad_token = tokenizer.eos_token
 data_location = "data/shakespeare"
 file_names = ["train.txt", "validation.txt", "test.txt"]
 
-batch_size = 128
-context_length = 1024       #gpt2 124M has context_length = 1024
-embed_dim = 768             #gpt2 124M had embed_dim = 768
+batch_size = 2            #Not sure what gpt2 used
+context_length = 64       #gpt2 124M has context_length = 1024
+embed_dim = 128             #gpt2 124M had embed_dim = 768
     
-num_heads = 12               #gpt2 124M had num_heads = 12
-num_decoders = 12           #gpt2 124M had num_decoders = 12
-activation = "gelu"
+num_heads = 4              #gpt2 124M had num_heads = 12
+num_decoders = 2           #gpt2 124M had num_decoders = 12
+activation = "gelu"         #gpt2 used "gelu"
 dropout = 0.1
 
-epochs = 10000
-eval_interval = 1000
-eval_iterations = 400
+epochs = 2
+val_interval = 1
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 #-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -41,24 +43,12 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 
 #Functions/Class Definitions------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------    
-class TextDataset(Dataset):
-    def __init__(self, text):
-        super(TextDataset, self).__init__()
-        self.data = text
-        self.len = len(tokenizer.tokenize(self.data))
-
-    def __len__(self):
-        return self.len
-
-    def __getitem__(self):
-        pass        
-
-
 class gpt2(nn.Module):
-    def __init__(self, vocab_size, embed_dim, tokenizer):
+    def __init__(self, vocab_size, embed_dim, context_length, tokenizer):
         super(gpt2, self).__init__()
         #Save the tokenizer to be used in the generate function
         self.tokenizer = tokenizer
+        self.context_length = context_length
         
         #Define the embeddings
         self.tok_emb = nn.Embedding(vocab_size, embed_dim)
@@ -70,13 +60,13 @@ class gpt2(nn.Module):
         self.layerNorm = nn.LayerNorm(embed_dim)
         
         #Define the prediciton head
-        self.pred_head = nn.Linear(embed_dim, vocab_size, bias = False)
+        self.pred_head = nn.Linear(embed_dim, vocab_size)
         
         
     def forward(self, idx, padding_mask=None):
         #idx is of shape = (B, T)
-        if idx.shape[1] > context_length:
-            raise ValueError(f"Cannot input text greater than {context_length} number of tokens.")
+        if idx.shape[1] > self.context_length:
+            raise ValueError(f"Cannot input text greater than {self.context_length} number of tokens.")
         
         tok_emb = self.tok_emb(idx)  #Get the token emebedding: self.embedding(idx) is (B, T, embed_dim)
         pos_emb = self.pos_emb(torch.arange(idx.shape[1]).to(device)) #Get the positional embedding which is of shape: (T, embed_dim)
@@ -98,9 +88,9 @@ class gpt2(nn.Module):
             )
         #The output is still (B, T, embed_dim)
         
-        #We want to grab the last token embedding in each batch. x[:,-1,:] does this and is of shape (batch_size, embed_dim)
-        #We pass it through a layernorm and then the prediction head to get logits of size (batch_size, vocab_size)
-        logits = self.pred_head(self.layerNorm(x[:,-1,:]))
+        #We then put it through a linear head to get the logits, which converts it to shape (B, T, vocab_size)
+        logits = self.pred_head(self.layerNorm(x))
+            #Output size: (B, T, vocab_size)
         
         return logits
     
@@ -118,8 +108,8 @@ class gpt2(nn.Module):
             token_ids = torch.tensor(output_dict["input_ids"]).to(device).unsqueeze(0)   #token_ids is of shape (1, num_tokens_in_input_text)
 
             #Throw an error if the input text is longer than the maximum allowable tokens
-            if token_ids.shape[1] > context_length:
-                raise ValueError(f"You have entered text that is too long. The maximum context length is: {context_length}")
+            if token_ids.shape[1] > self.context_length:
+                raise ValueError(f"You have entered text that is too long. The maximum context length is: {self.context_length}")
 
             next_token_id = -1
 
@@ -128,7 +118,8 @@ class gpt2(nn.Module):
                     break
                 
                 #Push the sequence through the model and get the probabilities
-                logits = self(token_ids).squeeze()      #logits is of shape (vocab_size)    
+                logits = self(token_ids).squeeze()      #logits is of shape (num_tokens_in_input_text, vocab_size)  
+                logits = logits[-1,:].squeeze()         #We only care about the logits associated with the LAST token embedding. Logits now has shape (vocab_size)  
                 probs = F.softmax(logits, dim = -1)     #probs is of shape (vocab_size)
                 k_probs, k_indices = torch.topk(probs, topk)  #k_probs and indices are of shape (topk)
                 
@@ -156,8 +147,8 @@ def validation_func(model, loss_func, device, val_loader):
    for x, y in val_loader:
        x, y = x.to(device), y.to(device)
       
-       logits = model(x)
-       val_loop_losses.append(loss_func(logits, y).item())
+       logits = model(x)    #logits has shape (B, T, vocab_size)
+       val_loop_losses.append(loss_func(logits.view(-1, logits.shape[-1]), y.view(-1)).item())    #We reshape logits to be of shape (B*T, vocab_size) and targets to be of shape (B*T)
       
    return torch.mean(val_loop_losses)
     
@@ -168,14 +159,13 @@ def train(model, optimizer, scheduler, loss_func, device, train_loader, val_load
     val_losses = []
     patience_count = 0
     
-    for epoch in range(epochs):
+    for epoch in tqdm(range(epochs)):
         for x, y in train_loader:
             x, y = x.to(device), y.to(device)      
             optimizer.zero_grad()
 
-
-            logits = model(x)
-            loss = loss_func(logits, y)
+            logits = model(x)   #of shape (B, T, vocab_size)
+            loss = loss_func(logits.view(-1, logits.shape[-1]), y.view(-1))   #Reshape to size (B*T, vocab_size) and (vocab_size), which is what CELoss is expecting
             train_losses.append(loss.item())
             loss.backward()
             optimizer.step()
@@ -215,13 +205,28 @@ def train(model, optimizer, scheduler, loss_func, device, train_loader, val_load
 
 
 #Define a function to graph the losses
-def graph_losses(losses: list, name: str):
+def graph_losses(losses: list, name: str, epochs: int):  #name should be "train" or "validation" or "test"
     plt.plot(np.arange(len(losses)), losses)
     plt.xlabel("Epochs")
     plt.ylabel(f"{name} Loss")
     plt.title(f"{name} Loss over Time")  
-    plt.savefig(f"{name}_Loss_{len(losses)*(epochs//eval_interval)}_Epochs.png")  
+    if name == "train" or name == "test":
+        plt.savefig(f"{name}_loss_{len(losses)}_Epochs.png")  
+    elif name == "validation":
+        plt.savefig(f"{name}_loss_{len(losses)*(epochs//val_interval)}_Epochs.png")  
     plt.clf()
+    
+class TextDataset(Dataset):
+    def __init__(self, text, context_length):
+        super(TextDataset, self).__init__()
+        self.data = text
+        self.context_length = context_length
+
+    def __len__(self):
+        return len(self.data) - self.context_length
+
+    def __getitem__(self, i):
+        return self.data[i : i+self.context_length], self.data[i+1 : i+self.context_length+1]
 #----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -234,38 +239,49 @@ def graph_losses(losses: list, name: str):
 data = dict()
 for current_file in file_names:
     with open(os.path.join(data_location, current_file), "r") as file:
-        data[current_file[:current_file.find(".")]] = file.read()
-
-for key in data.keys():
-    data[key] = data[key]
+        data[current_file[:current_file.find(".")]] = torch.tensor(tokenizer.convert_tokens_to_ids(tokenizer.tokenize(file.read())))
 
 
-
-
-
-
-
-
+#Create the train and val dataset and the train and val dataloader
+train_data = TextDataset(data["train"], context_length)
+val_data = TextDataset([data["validation"]], context_length)
+train_loader = DataLoader(train_data, batch_size = batch_size, shuffle = True, pin_memory = True)
+val_loader = DataLoader(val_data, batch_size = batch_size, shuffle = False, pin_memory = True)
 
 #Create the model and optimizer
-# gpt = gpt2(vocab_size, embed_dim, tokenizer).to(device)
-# gpt.to(device)
-# print(gpt.generate("This is my input sequence"))
+gpt = gpt2(vocab_size, embed_dim, context_length, tokenizer).to(device)
+gpt.to(device)
 
+#Create the optimizer, scheduler, and loss function
+optimizer = optim.AdamW(gpt.parameters())
+scheduler = lr_scheduler.StepLR(optimizer, step_size = 30)
+loss_function = nn.CrossEntropyLoss()
 
-# #Create the optimizer and scheduler
-# optimizer = optim.AdamW(gpt.parameters())
-# scheduler = lr_scheduler.StepLR(optimizer, step_size = 30)
+# Train the model
+training_losses, val_losses, smallest_val_loss, trained_epochs = train(
+    gpt, 
+    optimizer, 
+    scheduler, 
+    loss_function, 
+    device, 
+    train_loader, 
+    val_loader, 
+    validation_func, 
+    epochs, 
+    val_interval, 
+    float("inf"), 
+    10, 
+    "checkpoints/checkpoint.pt",
+    True
+    )
 
-# # Train the model
-# training_losses, eval_losses = train(gpt, optimizer, epochs)
 
 # #Save graphs of the losses
-# graph_losses(training_losses, "Training")
-# graph_losses(eval_losses, "Testing")
+graph_losses(training_losses, "train", trained_epochs)
+graph_losses(val_losses, "validation", trained_epochs)
 
-# # #Generate and print out a text sample
-# new_text = gpt.generate("How can this be done?", max_new_tokens = 30)
-# print()
-# print(new_text)
-# print()
+# #Generate and print out a text sample
+new_text = gpt.generate("Where goest thou?", max_new_tokens = 30)
+print()
+print(new_text)
+print()
