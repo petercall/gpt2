@@ -22,18 +22,24 @@ tokenizer.pad_token = tokenizer.eos_token
 
 data_location = "data/shakespeare"
 file_names = ["train.txt", "validation.txt", "test.txt"]
+checkpoint_storage_location = "checkpoints/shakespeare/checkpoint-1.pt"
 
-batch_size = 2            #Not sure what gpt2 used
-context_length = 64       #gpt2 124M has context_length = 1024
-embed_dim = 128             #gpt2 124M had embed_dim = 768
+batch_size = 128             #Not sure what gpt2 used
+context_length = 1024        #gpt2 124M has context_length = 1024
+embed_dim = 768              #gpt2 124M had embed_dim = 768
     
-num_heads = 4              #gpt2 124M had num_heads = 12
-num_decoders = 2           #gpt2 124M had num_decoders = 12
-activation = "gelu"         #gpt2 used "gelu"
+num_heads = 12               #gpt2 124M had num_heads = 12
+num_decoders = 12            #gpt2 124M had num_decoders = 12
+activation = "gelu"          #gpt2 used "gelu"
 dropout = 0.1
 
-epochs = 2
+epochs = 20
 val_interval = 1
+print_losses = True
+stop_patience = 5          #How many validation loops with no decrease in validation loss before the training stops
+
+scheduler_patience = 4      #How many validation loops with no decrease in validation loss before the learning rate is multiplied by factor
+scheduler_factor = .2        #The factor that the learning rate gets multiplied by when it is not improving
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 #-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -158,6 +164,7 @@ def train(model, optimizer, scheduler, loss_func, device, train_loader, val_load
     train_losses = []
     val_losses = []
     patience_count = 0
+    val_epoch_count = 0
     
     for epoch in tqdm(range(epochs)):
         for x, y in train_loader:
@@ -172,6 +179,7 @@ def train(model, optimizer, scheduler, loss_func, device, train_loader, val_load
 
 
         if epoch % val_interval == 0:
+            val_epoch_count += 1
             val_loss = validation_func(model, loss_func, device, val_loader)
             val_loss.append(val_loss.item())
 
@@ -189,7 +197,7 @@ def train(model, optimizer, scheduler, loss_func, device, train_loader, val_load
             else:
                 patience_count += 1
                 if patience_count > patience:
-                    return train_losses, val_losses, smallest_val_loss, epoch+1
+                    return train_losses, val_losses, smallest_val_loss
                 
             if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                 scheduler.step(val_loss)
@@ -201,19 +209,16 @@ def train(model, optimizer, scheduler, loss_func, device, train_loader, val_load
         if not isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
             scheduler.step()
 
-    return train_losses, val_losses, smallest_val_loss, epochs     
+    return train_losses, val_losses, smallest_val_loss    
 
 
 #Define a function to graph the losses
-def graph_losses(losses: list, name: str, epochs: int):  #name should be "train" or "validation" or "test"
+def graph_losses(losses, name): 
     plt.plot(np.arange(len(losses)), losses)
     plt.xlabel("Epochs")
     plt.ylabel(f"{name} Loss")
     plt.title(f"{name} Loss over Time")  
-    if name == "train" or name == "test":
-        plt.savefig(f"{name}_loss_{len(losses)}_Epochs.png")  
-    elif name == "validation":
-        plt.savefig(f"{name}_loss_{len(losses)*(epochs//val_interval)}_Epochs.png")  
+    plt.savefig(f"{name}_loss_{len(losses)}_Epochs.png")
     plt.clf()
     
 class TextDataset(Dataset):
@@ -254,34 +259,28 @@ gpt.to(device)
 
 #Create the optimizer, scheduler, and loss function
 optimizer = optim.AdamW(gpt.parameters())
-scheduler = lr_scheduler.StepLR(optimizer, step_size = 30)
+scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, patience = 5, factor = .2)
 loss_function = nn.CrossEntropyLoss()
 
 # Train the model
-training_losses, val_losses, smallest_val_loss, trained_epochs = train(
-    gpt, 
-    optimizer, 
-    scheduler, 
-    loss_function, 
-    device, 
-    train_loader, 
-    val_loader, 
-    validation_func, 
-    epochs, 
-    val_interval, 
-    float("inf"), 
-    10, 
-    "checkpoints/checkpoint.pt",
-    True
+train_losses, val_losses, smallest_val_loss = train(
+    gpt,                #model
+    optimizer,          #optimizer
+    scheduler,          #lr scheduler
+    loss_function,      #loss function
+    device,             #torch device
+    train_loader,       #train loader
+    val_loader,         #val loader
+    validation_func,    #function used for validation
+    epochs,             #epochs to train for
+    val_interval,       #How often to validate
+    float("inf"),       #current smallest validation loss
+    patience,           #patience
+    checkpoint_storage_location,    #location to store checkpoint
+    print_losses        #print losses
     )
 
 
 # #Save graphs of the losses
-graph_losses(training_losses, "train", trained_epochs)
-graph_losses(val_losses, "validation", trained_epochs)
-
-# #Generate and print out a text sample
-new_text = gpt.generate("Where goest thou?", max_new_tokens = 30)
-print()
-print(new_text)
-print()
+graph_losses(train_losses, "Train")
+graph_losses(val_losses, "Validation")

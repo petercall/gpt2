@@ -8,8 +8,5 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-print()
-print(torch.cuda.is_available())
-print(torch.cuda.device_count())
-print(torch.cuda.device(0))
-print()
+
+data = pd.read_csv("data/subjects/train.csv")
