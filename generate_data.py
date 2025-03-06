@@ -6,37 +6,47 @@ from transformers import pipeline
 from tqdm import tqdm
 import torch
 import numpy as np
+import copy
+import os
+
 
 #Hyperparameters---------------------------------------------------------------------------------------------------------------------------------------------------------------
 data_location = "data/subjects/train.csv"
+column_of_interest = "generation"
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-model_name = "microsoft/Phi-3-mini-4k-instruct"    # model_name = "mistralai/Mistral-7B-Instruct-v0.3"     
+# model_name = "microsoft/Phi-3-mini-4k-instruct"    
+model_name = "mistralai/Mistral-7B-Instruct-v0.3"     
 batch_size = 2
 generation_args = {
     "max_new_tokens" : 300,
     "do_sample" : True,
 }
+model_args = {
+    "torch_dtype" : torch.bfloat16,
+    "device_map" : "auto"
+}
 #-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+print(device)
 
-
-
+#Change the location to the current working directory, to avoid all confusion
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 #Load in the data
 data = pd.read_csv(data_location)
-# print(data.head())
 
 #Load in the model and the tokenizer and put the model onto the gpu
-model = AutoModelForCausalLM.from_pretrained(model_name).to(device)
-tokenizer = AutoTokenizer.from_pretrained(model_name, padding_side = "left")
-tokenizer.padding_side = "left"
+model = AutoModelForCausalLM.from_pretrained(model_name, **model_args).to(device)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+if tokenizer.padding_side != "left":
+    tokenizer.padding_side = "left"
 if tokenizer.pad_token is None:
-    tokenizer.pad_token = tokenizer.bos_token
+    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.pad_token_id = tokenizer.eos_token_id
 
 #Set the request you want the model to do and the chat-message format
 # request = "Write me a paragraph that might be found in a textbook before the following text"
-role = "You are an AI writer"
 message = [
-    {"role": "user", "content": role},
     {"role": "user", "content": ""}
 ]
 
@@ -53,24 +63,44 @@ for i in range(iters):
         internal_iters = extra
     else:
         internal_iters = batch_size
-    print()
 
-    import copy
+
     for j in range(internal_iters):
         current_message = copy.deepcopy(message)
-        current_message[1]["content"] = data.at[(i*batch_size) + j, "generation"]
+        current_message[0]["content"] = data.at[(i*batch_size) + j, column_of_interest]
         messages.append(current_message)
 
     my_dict = tokenizer(tokenizer.apply_chat_template(messages, tokenize = False), add_special_tokens = False, return_tensors = "pt", padding = True)
     input_ids = my_dict["input_ids"].to(device)
     attention_mask = my_dict['attention_mask'].to(device)
-    print(input_ids)
-
+    
     generated_ids = model.generate(input_ids, attention_mask = attention_mask, **generation_args)
+    print()
+    print(generated_ids.shape)
+    print(generated_ids)
+    print()
 
     batch = tokenizer.batch_decode(generated_ids, skip_special_tokens = True)
     print()
-    print(batch[0])
-    print()
+    print(batch)
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+print()

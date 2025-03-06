@@ -1,6 +1,13 @@
-#Ignore pictures
+#pictures
 *.png
 
-#Ignore data files
+#data files
 *.txt
 *.csv
+
+#log files
+*.err
+*.out
+
+#job files
+*.job
