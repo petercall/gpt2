@@ -9,10 +9,12 @@ import numpy as np
 import copy
 import os
 from tqdm import tqdm
+import sys
 
 
 #Hyperparameters---------------------------------------------------------------------------------------------------------------------------------------------------------------
-data_location = "data/subjects/train.csv"
+input_args = sys.argv
+data_location = f"../../data/subjects/train{input_args[1]}.csv"
 column_of_interest = "generation"
 new_column = "model_output"
 num_to_do = "all"       #This is the number of inputs for the model to generate for. To do them all, set num_to_do = "all"
@@ -20,7 +22,7 @@ num_to_do = "all"       #This is the number of inputs for the model to generate 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 model_name = "mistralai/Mistral-7B-Instruct-v0.3"     # model_name = "microsoft/Phi-3-mini-4k-instruct"    
 batch_size = 32
-save_interval = 1     #This is how many BATCHES it will run in between data saves
+save_interval = 40     #This is how many BATCHES it will run in between data saves
 
 generation_args = {
     "max_new_tokens" : 22000,

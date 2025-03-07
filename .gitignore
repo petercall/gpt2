@@ -11,3 +11,9 @@
 
 #job files
 *.job
+
+#Something to do with torch .py files
+*.pyc
+
+#Checkpoints
+*.pt
