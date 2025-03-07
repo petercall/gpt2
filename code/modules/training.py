@@ -2,6 +2,7 @@
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
+from tqdm import tqdm
 
 #Define a validation function
 @torch.no_grad()
@@ -25,7 +26,7 @@ def train(model, optimizer, scheduler, loss_func, device, train_loader, val_load
     patience_count = 0
     val_epoch_count = 0
     
-    for epoch in range(epochs):
+    for epoch in tqdm(range(epochs)):
         for x, y in train_loader:
             x, y = x.to(device), y.to(device)      
             optimizer.zero_grad()
@@ -72,10 +73,10 @@ def train(model, optimizer, scheduler, loss_func, device, train_loader, val_load
 
 
 #Define a function to graph the losses
-def graph_losses(losses, name): 
+def graph_losses(losses, name, save_location): 
     plt.plot(np.arange(len(losses)), losses)
     plt.xlabel("Epochs")
     plt.ylabel(f"{name} Loss")
     plt.title(f"{name} Loss over Time")  
-    plt.savefig(f"{name}_loss_{len(losses)}_Epochs.png")
+    plt.savefig(f"{save_location}/{name}_loss_{len(losses)}_Epochs.png")
     plt.clf()
