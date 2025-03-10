@@ -20,7 +20,7 @@ def validation_func(model, loss_func, device, val_loader):
     
         
 #Define a training loop function
-def train(model, optimizer, scheduler, loss_func, device, train_loader, val_loader, validation_func, epochs, val_interval, smallest_val_loss, patience, checkpoint_filepath, print_losses):
+def train(model, optimizer, scheduler, loss_func, device, train_loader, val_loader, validation_func, epochs, val_interval, smallest_val_loss, patience, checkpoint_filepath):
     train_losses = []
     val_losses = []
     patience_count = 0
@@ -62,9 +62,7 @@ def train(model, optimizer, scheduler, loss_func, device, train_loader, val_load
             if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                 scheduler.step(val_loss)
             
-            if print_losses:
-                print(f"Training Loss: {round(loss.item(),3)}, Validation Loss: {round(val_loss,3)}")
-                print()
+            print(f"Epoch: {epoch+1}/{epochs}, Training Loss: {round(loss.item(),3)}, Validation Loss: {round(val_loss,3)}")
       
         if not isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
             scheduler.step()

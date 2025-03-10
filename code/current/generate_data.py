@@ -13,17 +13,23 @@ import sys
 
 
 #Hyperparameters---------------------------------------------------------------------------------------------------------------------------------------------------------------
-input_args = sys.argv
-data_location = f"../../data/subjects/train{input_args[1]}.csv"
-column_of_interest = "generation"
-new_column = "model_output"
-num_to_do = "all"       #This is the number of inputs for the model to generate for. To do them all, set num_to_do = "all"
+# input_args = sys.argv
+# data_location = f"../../data/subjects/intermediate_data/train{input_args[1]}.csv"
+data_location = "../../data/subjects/test.csv"
+data_column = "question"            #The column that contains the MMLU question
+new_column = "model_output"         #The new column that will be created that will contain the model output
+column_of_interest = "generation"   #The column name where the prepend + question will be put (or is currently located)
+prepend = "Provide a comprehensive, lengthy, detailed, textbook-quality entry that thoroughly introduces the concepts leading up to the following prompt. The explanation should be exhaustive, multi-faceted, and thorough, and should include examples, case studies, definitions, open questions, historical context, and all other details surrounding the topic to ensure the response is no less than 20,000 tokens."
+overwrite = False       #This is whether to overwrite the column_of_interest if it is already found in the dataset
+num_to_do = "all"       #This is the number of inputs for the model to generate for.
+                        #If num_to_do = "all", it starts at the first nan and does till the end of the dataset
+                        #If num_to_do is an integer, it starts at the first nan and does that many.
+
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 model_name = "mistralai/Mistral-7B-Instruct-v0.3"     # model_name = "microsoft/Phi-3-mini-4k-instruct"    
-batch_size = 32
+batch_size = 16
 save_interval = 40     #This is how many BATCHES it will run in between data saves
-
 generation_args = {
     "max_new_tokens" : 22000,
     "do_sample" : True,
@@ -34,12 +40,21 @@ model_args = {
 }
 #-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+
+
+
+#input---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #Change the location to the current working directory, to avoid all confusion
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-#Load in the data and create the new column
+#Load in the data and create the new column as well as the column with the question in it
 data = pd.read_csv(data_location)
-data[new_column] = ""
+if new_column not in data.columns:
+    data[new_column] = np.nan
+if column_of_interest not in data.columns:
+    data[column_of_interest] = prepend + " Prompt: " + data[data_column]
+elif overwrite:
+    data[column_of_interest] = prepend + " Prompt: " + data[data_column]
 
 #Load in the model and the tokenizer and put the model onto the gpu
 model = AutoModelForCausalLM.from_pretrained(model_name, **model_args).to(device)
@@ -56,15 +71,21 @@ message = [
     {"role": "user", "content": ""}
 ]
 
-#Calculate the number of loops you need to perform
+#Calculate the number of loops you need to perform and where to start the first one
+num_nans = data[new_column].isna().sum()
 if num_to_do == "all":
-    num_to_do = data.shape[0]
+    num_to_do = num_nans
+start_position = data.shape[0] - num_nans
+   
+#Calculate the number of iterations that need to be performed ("iters"), and the number of data points that will be in the last iteration ("extra")
 iters = num_to_do // batch_size
 extra = num_to_do - (iters * batch_size)
 iters = iters + 1 if extra != 0 else iters
 
 for i in tqdm(range(iters)):
     messages = []
+    
+    #Calculate how many loops to do in this iteration
     if extra != 0 and i == iters - 1:
         internal_iters = extra
     else:
@@ -73,7 +94,7 @@ for i in tqdm(range(iters)):
 
     for j in range(internal_iters):
         current_message = copy.deepcopy(message)
-        data_row = (i*batch_size) + j
+        data_row = (i*batch_size) + j + start_position
         current_message[0]["content"] = data.at[data_row, column_of_interest]
         messages.append(current_message)
 
@@ -87,7 +108,7 @@ for i in tqdm(range(iters)):
     
     #Get rid of the prepended message at the beginning so that the output only contains the tokens the model generated
     for j in range(internal_iters):
-        data_row = (i*batch_size) + j
+        data_row = (i*batch_size) + j + start_position
         text[j] = text[j][len(data.at[data_row, column_of_interest]):].strip()
         data.at[data_row, new_column] = text[j]
 

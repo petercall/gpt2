@@ -31,16 +31,15 @@ num_decoders = 12            #gpt2 124M had num_decoders = 12
 activation = "gelu"          #gpt2 used "gelu"
 dropout = 0.1
 
-epochs = 10
+epochs = 40
 val_interval = 1
 smallest_val_loss = float("inf")
-print_losses = True
-stop_patience = 5          #How many validation loops with no decrease in validation loss before the training stops
+stop_patience = 7          #How many validation loops with no decrease in validation loss before the training stops
 
-scheduler_patience = 3      #How many validation loops with no decrease in validation loss before the learning rate is multiplied by factor
-scheduler_factor = .2        #The factor that the learning rate gets multiplied by when it is not improving
+scheduler_patience = 4      #How many validation loops with no decrease in validation loss before the learning rate is multiplied by factor
+scheduler_factor = .3        #The factor that the learning rate gets multiplied by when it is not improving
 
-checkpoint_storage_location = "checkpoints/subjects/checkpoint-intermediate-1.pt"
+checkpoint_storage_location = "../../checkpoints/subjects/checkpoint-intermediate-2.pt"
 graph_save_location = "../../outputs/graphs"
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -89,7 +88,6 @@ train_losses, val_losses, smallest_val_loss = train(
     smallest_val_loss,  #current smallest validation loss
     stop_patience,      #Number of validation runs with no improvement after which we terminate the training loop
     checkpoint_storage_location,    #location to store checkpoint
-    print_losses        #print losses
     )
 
 print(f"Smallest Val loss is: {smallest_val_loss}")
