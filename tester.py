@@ -10,9 +10,9 @@ import torch.nn.functional as F
 import sys
 import os
 from tqdm import tqdm
-from sklearn.model_selection import train_test_split
 
 
 
-data = pd.read_csv("data/subjects/test.csv")
-print(data.shape[0])
+
+
+

@@ -11,20 +11,17 @@ import os
 from tqdm import tqdm
 import sys
 
-
 #Hyperparameters---------------------------------------------------------------------------------------------------------------------------------------------------------------
 # input_args = sys.argv
 # data_location = f"../../data/subjects/intermediate_data/train{input_args[1]}.csv"
-data_location = "../../data/subjects/test.csv"
+data_location = "../../data/subjects/validation.csv"
 data_column = "question"            #The column that contains the MMLU question
 new_column = "model_output"         #The new column that will be created that will contain the model output
 column_of_interest = "generation"   #The column name where the prepend + question will be put (or is currently located)
 prepend = "Provide a comprehensive, lengthy, detailed, textbook-quality entry that thoroughly introduces the concepts leading up to the following prompt. The explanation should be exhaustive, multi-faceted, and thorough, and should include examples, case studies, definitions, open questions, historical context, and all other details surrounding the topic to ensure the response is no less than 20,000 tokens."
-overwrite = False       #This is whether to overwrite the column_of_interest if it is already found in the dataset
-num_to_do = "all"       #This is the number of inputs for the model to generate for.
-                        #If num_to_do = "all", it starts at the first nan and does till the end of the dataset
-                        #If num_to_do is an integer, it starts at the first nan and does that many.
-
+overwrite = False                   #This is whether to overwrite the column_of_interest if it is already found in the dataset
+num_to_do = "all"                   #This is the number of inputs for the model to generate for. If it is "all", then it will do from start_position to the end of the csv file
+start_position = "first nan"        #If this is "first nan" it will start at the first nan it finds in new_column. If it is a number, then it will start at the row with that index value.
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 model_name = "mistralai/Mistral-7B-Instruct-v0.3"     # model_name = "microsoft/Phi-3-mini-4k-instruct"    
@@ -39,7 +36,6 @@ model_args = {
     "device_map" : "auto"
 }
 #-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
 
 
 
@@ -75,7 +71,8 @@ message = [
 num_nans = data[new_column].isna().sum()
 if num_to_do == "all":
     num_to_do = num_nans
-start_position = data.shape[0] - num_nans
+if start_position == "first nan":
+    start_position = data.shape[0] - num_nans
    
 #Calculate the number of iterations that need to be performed ("iters"), and the number of data points that will be in the last iteration ("extra")
 iters = num_to_do // batch_size
