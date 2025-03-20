@@ -43,6 +43,7 @@ def train(model, optimizer, scheduler, loss_func, device, train_loader, val_load
             val_loss = validation_func(model, loss_func, device, val_loader)
             val_losses.append(val_loss)
 
+            print(f"Epoch: {epoch+1}/{epochs}, Training Loss: {round(loss.item(),3)}, Validation Loss: {round(val_loss,3)}")
 
             if val_loss < smallest_val_loss:
                 patience_count = 0     
@@ -62,8 +63,6 @@ def train(model, optimizer, scheduler, loss_func, device, train_loader, val_load
             if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                 scheduler.step(val_loss)
             
-            print(f"Epoch: {epoch+1}/{epochs}, Training Loss: {round(loss.item(),3)}, Validation Loss: {round(val_loss,3)}")
-      
         if not isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
             scheduler.step()
 

@@ -18,10 +18,10 @@ tokenizer = AutoTokenizer.from_pretrained("gpt2", clean_up_tokenization_spaces =
 vocab_size = tokenizer.vocab_size
 tokenizer.pad_token = tokenizer.eos_token
 
-data_location = "../../data/subjects/intermediate_text"
-file_names = ["intermediate_train.txt", "intermediate_val.txt"]
+data_location = "../../data/subjects"
+file_names = {"train" : "train", "validation" : "validation"}     #Do NOT include .txt at the end, just the name of the file without the filetype. Adjust only the values, NOT the keys
 
-batch_size = 32              #Not sure what gpt2 used
+batch_size = 24              #Not sure what gpt2 used
 embed_dim = 768              #gpt2 124M had embed_dim = 768
 context_length = 1024        #gpt2 124M has context_length = 1024
 token_window_slide = context_length // 2 #This is how many tokens each input data point slides over
@@ -31,15 +31,15 @@ num_decoders = 12            #gpt2 124M had num_decoders = 12
 activation = "gelu"          #gpt2 used "gelu"
 dropout = 0.1
 
-epochs = 40
+epochs = 150
 val_interval = 1
 smallest_val_loss = float("inf")
-stop_patience = 7          #How many validation loops with no decrease in validation loss before the training stops
+stop_patience = 6          #How many validation loops with no decrease in validation loss before the training stops
 
-scheduler_patience = 4      #How many validation loops with no decrease in validation loss before the learning rate is multiplied by factor
+scheduler_patience = 2      #How many validation loops with no decrease in validation loss before the learning rate is multiplied by factor
 scheduler_factor = .3        #The factor that the learning rate gets multiplied by when it is not improving
 
-checkpoint_storage_location = "../../checkpoints/subjects/checkpoint-intermediate-2.pt"
+checkpoint_storage_location = "../../checkpoints/subjects/checkpoint-1.pt"
 graph_save_location = "../../outputs/graphs"
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -53,14 +53,14 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 #load in the train, validation, and test text
 data = dict()
-for current_file in file_names:
-    with open(os.path.join(data_location, current_file), "r") as file:
-        data[current_file[:current_file.find(".")]] = torch.tensor(tokenizer.convert_tokens_to_ids(tokenizer.tokenize(file.read())))
+for current_file in file_names.keys():
+    with open(os.path.join(data_location, file_names[current_file] + ".txt"), "r") as file:
+        data[current_file] = torch.tensor(tokenizer.convert_tokens_to_ids(tokenizer.tokenize(file.read())))
 
 
 #Create the train and val dataset and the train and val dataloader
-train_data = TextDataset(data["intermediate_train"], context_length, token_window_slide)
-val_data = TextDataset(data["intermediate_val"], context_length, token_window_slide)
+train_data = TextDataset(data["train"], context_length, token_window_slide)
+val_data = TextDataset(data["validation"], context_length, token_window_slide)
 train_loader = DataLoader(train_data, batch_size = batch_size, shuffle = True, pin_memory = True)
 val_loader = DataLoader(val_data, batch_size = batch_size, shuffle = False, pin_memory = True)
 
