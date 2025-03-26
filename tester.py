@@ -1,27 +1,41 @@
-# from matplotlib import pyplot as plt
-# import numpy as np
-# import pandas as pd
-# from transformers import AutoTokenizer, AutoModelForCausalLM
-# from transformers import AutoTokenizer
-# import torch.optim.lr_scheduler as lr_scheduler
-# import torch.optim as optim
-# import torch
-# import torch.nn as nn
-# import torch.nn.functional as F
-# import sys
-import os
-# from tqdm import tqdm
 import pandas as pd
-
-location = "data/subjects"
-names = ["train", "validation", "test"]
-
-for name in names:
-    in_file = os.path.join(location, name + ".csv")
-    data = pd.read_csv(in_file) 
-    text = data["model_output"].str.cat(sep = " ")
-    out_file = os.path.join(location, name + ".txt")
-    with open(out_file, 'w') as my_file:
-        my_file.write(text)
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import pipeline
+import numpy as np
 
 
+
+
+
+# train = pd.read_csv("data/subjects/train.csv")
+
+# MODEL_NAME = "facebook/bart-large-mnli"
+
+# model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
+# tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+# pipe = pipeline("zero-shot-classification", model = model, tokenizer = tokenizer, device = "cuda")
+
+
+# my_list = [99840, 99841]
+# for i in my_list:
+#     text = train.at[i, "question"]
+#     output = pipe(text, TARGET_CLASSES)
+#     train.loc[i, "subject_2"] = output["labels"][0]
+    
+# train.to_csv("data/subjects/train.csv", index=False)
+
+
+
+
+
+
+# train = pd.read_csv("data/subjects/train.csv")
+# TARGET_CLASSES = ["mathematics", "logic", "physics", "chemistry", "biology", "medicine", "history", "social sciences", "computer science", "business", "law", "philosophy", "miscellaneous"]
+# for target in TARGET_CLASSES:
+#     data = train["question"][train["subject_2"] == target]
+#     data = data.sample(7)
+#     print(f"CLASS: {target} ----------------------------------------------------------------------------------")
+#     for val in data:
+#         print(val)
+#         print()
+#     print()
