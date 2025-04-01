@@ -17,3 +17,6 @@
 
 #Checkpoints
 *.pt
+
+#tester
+tester.py
