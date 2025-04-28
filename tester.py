@@ -1,12 +1,23 @@
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoModelForCausalLM
 from transformers import pipeline
 import numpy as np
+import torch
 
+print(torch.cuda.is_available())
 
-data = pd.read_csv("data/subjects/train.csv")
-print(round(data["subject"].value_counts() * 100 / data.shape[0], 2))
+# data = pd.read_csv("data/subjects/train.csv")
+# print(round(data["subject"].value_counts() * 100 / data.shape[0], 2))
+# device = torch.device("cuda")
 
+# model_name = "mistralai/Mistral-7B-Instruct-v0.3"
+# model_args = {
+#     "torch_dtype" : torch.bfloat16,
+#     "device_map" : "auto"
+# }
+# model = AutoModelForCausalLM.from_pretrained(model_name, **model_args).to(device)
+# print(model.device)
 
 
 

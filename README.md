@@ -1,3 +1,3 @@
-# GPT2
+# Pretraining
 
-In this repository I train a language model in the fashion of GPT2 on text from Shakespeare plays.
+In this repository I pretrain a language model built from scratch similar in architecture to GPT2.

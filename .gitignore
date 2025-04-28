@@ -12,11 +12,13 @@
 #job files
 *.job
 
-#Something to do with torch .py files
+#pycache folder
+__pycache__
 *.pyc
 
 #Checkpoints
 *.pt
+*.pth
 
 #tester
 tester.py

@@ -1,26 +1,26 @@
 
 import torch
-import matplotlib.pyplot as plt
-import numpy as np
+import numpy
 from tqdm import tqdm
-
+      
 #Define a validation function
 @torch.no_grad()
-def validation_func(model, loss_func, device, val_loader):
-   model.eval()
-   val_loop_losses = []
+def validate(model, loss_func, device, val_loader):
+    model.eval()
+    val_loop_losses = []
   
-   for x, y in val_loader:
-       x, y = x.to(device), y.to(device)
+    for x, y in val_loader:
+        x, y = x.to(device), y.to(device)
       
-       logits = model(x)    #logits has shape (B, T, vocab_size)
-       val_loop_losses.append(loss_func(logits.view(-1, logits.shape[-1]), y.view(-1)).item())    #We reshape logits to be of shape (B*T, vocab_size) and targets to be of shape (B*T)
+        logits = model(x)    #logits has shape (B, T, vocab_size)
+        val_loop_losses.append(loss_func(logits.view(-1, logits.shape[-1]), y.view(-1)).item())    #We reshape logits to be of shape (B*T, vocab_size) and targets to be of shape (B*T)
       
-   return np.mean(val_loop_losses)
-    
-        
+    model.train()
+    return np.mean(val_loop_losses)
+      
+      
 #Define a training loop function
-def train(model, optimizer, scheduler, loss_func, device, train_loader, val_loader, validation_func, epochs, val_interval, smallest_val_loss, patience, checkpoint_filepath):
+def train(model, optimizer, scheduler, loss_func, device, train_loader, val_loader, validate, epochs, val_interval, smallest_val_loss, patience, checkpoint_filepath):
     train_losses = []
     val_losses = []
     patience_count = 0
@@ -40,7 +40,7 @@ def train(model, optimizer, scheduler, loss_func, device, train_loader, val_load
 
         if epoch % val_interval == 0:
             val_epoch_count += 1
-            val_loss = validation_func(model, loss_func, device, val_loader)
+            val_loss = validate(model, loss_func, device, val_loader)
             val_losses.append(val_loss)
 
             print(f"Epoch: {epoch+1}/{epochs}, Training Loss: {round(loss.item(),3)}, Validation Loss: {round(val_loss,3)}")
@@ -67,13 +67,3 @@ def train(model, optimizer, scheduler, loss_func, device, train_loader, val_load
             scheduler.step()
 
     return train_losses, val_losses, smallest_val_loss    
-
-
-#Define a function to graph the losses
-def graph_losses(losses, name, save_location): 
-    plt.plot(np.arange(len(losses)), losses)
-    plt.xlabel("Epochs")
-    plt.ylabel(f"{name} Loss")
-    plt.title(f"{name} Loss over Time")  
-    plt.savefig(f"{save_location}/{name}_loss_{len(losses)}_Epochs.png")
-    plt.clf()

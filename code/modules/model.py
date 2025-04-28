@@ -1,18 +1,22 @@
+#Regular imports
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from transformers import AutoTokenizer
+
+#File imports
+from .hyperparams import model_args, device, tokenizer_name, tokenizer_args
 
 class gpt2(nn.Module):
-    def __init__(self, vocab_size, embed_dim, context_length, tokenizer, device, num_heads, activation, dropout, num_decoders):
+    def __init__(self, tokenizer, embed_dim, num_heads, activation, dropout, num_decoders):
         super(gpt2, self).__init__()
         #Save the tokenizer to be used in the generate function
         self.tokenizer = tokenizer
-        self.context_length = context_length
-        self.device = device
+        self.context_length = tokenizer.model_max_length
         
         #Define the embeddings
-        self.tok_emb = nn.Embedding(vocab_size, embed_dim)
-        self.pos_emb = nn.Embedding(context_length, embed_dim)
+        self.tok_emb = nn.Embedding(tokenizer.vocab_size, embed_dim)
+        self.pos_emb = nn.Embedding(self.context_length, embed_dim)
         
         #Define the transformer
         self.transformer_layer = nn.TransformerEncoderLayer(embed_dim, nhead = num_heads, activation = activation, dropout = dropout, batch_first = True, norm_first = True, dim_feedforward = 4 * embed_dim)
@@ -20,30 +24,30 @@ class gpt2(nn.Module):
         self.layerNorm = nn.LayerNorm(embed_dim)
         
         #Define the prediciton head
-        self.pred_head = nn.Linear(embed_dim, vocab_size)
+        self.pred_head = nn.Linear(embed_dim, tokenizer.vocab_size)
         
         
-    def forward(self, idx, padding_mask=None):
+    def forward(self, idx, attention_mask=None):
         #idx is of shape = (B, T)
         if idx.shape[1] > self.context_length:
             raise ValueError(f"Cannot input text greater than {self.context_length} number of tokens.")
         
         tok_emb = self.tok_emb(idx)  #Get the token emebedding: self.embedding(idx) is (B, T, embed_dim)
-        pos_emb = self.pos_emb(torch.arange(idx.shape[1]).to(self.device)) #Get the positional embedding which is of shape: (T, embed_dim)
+        pos_emb = self.pos_emb(torch.arange(idx.shape[1]).to(next(self.parameters()).device)) #Get the positional embedding which is of shape: (T, embed_dim)
         x = tok_emb + pos_emb
         
         #Pass it through the transformer layer
-        if padding_mask is not None:
+        if attention_mask is not None:
             x = self.transformer(
                 x, 
-                mask = nn.Transformer.generate_square_subsequent_mask(x.shape[1]).to(torch.bool).to(self.device),
+                mask = nn.Transformer.generate_square_subsequent_mask(x.shape[1]).to(torch.bool).to(next(self.parameters()).device),
                 is_causal = True,
-                src_key_padding_mask = padding_mask.to(torch.bool)
+                src_key_attention_mask = attention_mask.to(torch.bool)
             )
         else:
             x = self.transformer(
                 x, 
-                mask = nn.Transformer.generate_square_subsequent_mask(x.shape[1]).to(self.device),
+                mask = nn.Transformer.generate_square_subsequent_mask(x.shape[1]).to(next(self.parameters()).device),
                 is_causal = True
             )
         #The output is still (B, T, embed_dim)
@@ -91,3 +95,9 @@ class gpt2(nn.Module):
             output_text = self.tokenizer.decode(input_ids.squeeze().tolist(), clean_up_tokenization_spaces=True)
         
         return output_text
+    
+#Load in the tokenizer
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, **tokenizer_args)
+
+#Load in the model
+model = gpt2(tokenizer = tokenizer, **model_args).to(device)
